@@ -92,8 +92,8 @@ function EntryEditor({ entry, onSave, onCancel }: EditorProps) {
 
 type FoodListProps = {
   entries: DiaryEntry[];
-  onUpdate: (entry: DiaryEntry) => void;
-  onDelete: (id: string) => void;
+  onUpdate: (entry: DiaryEntry) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 };
 
 export function FoodList({ entries, onUpdate, onDelete }: FoodListProps) {

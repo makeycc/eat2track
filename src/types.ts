@@ -18,3 +18,5 @@ export type DiaryEntry = {
   weight: number; // grams
   macrosOverride?: Partial<Macros>;
 };
+
+export type NewDiaryEntry = Omit<DiaryEntry, 'id'> & { id?: string };

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { AddProductForm } from '../components/AddProductForm';
 import { DaySlider } from '../components/DaySlider';
 import { useDiaryStore } from '../store/useDiaryStore';
+import { useEffect } from 'react';
 
 export function AddProductPage() {
   const selectedDate = useDiaryStore((state) => state.selectedDate);
@@ -9,6 +10,11 @@ export function AddProductPage() {
   const addEntry = useDiaryStore((state) => state.addEntry);
   const recordSearch = useDiaryStore((state) => state.recordSearch);
   const searchHistory = useDiaryStore((state) => state.searchHistory);
+  const fetchEntries = useDiaryStore((state) => state.fetchEntries);
+
+  useEffect(() => {
+    fetchEntries(selectedDate);
+  }, [fetchEntries, selectedDate]);
 
   return (
     <>

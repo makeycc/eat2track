@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DaySlider } from '../components/DaySlider';
 import { MacroSummary } from '../components/MacroSummary';
@@ -26,10 +26,15 @@ export function HomePage() {
   const selectedDate = useDiaryStore((state) => state.selectedDate);
   const setSelectedDate = useDiaryStore((state) => state.setSelectedDate);
   const entries = useDiaryStore((state) => state.entries[state.selectedDate] ?? []);
+  const fetchEntries = useDiaryStore((state) => state.fetchEntries);
   const updateEntry = useDiaryStore((state) => state.updateEntry);
   const deleteEntry = useDiaryStore((state) => state.deleteEntry);
 
   const totals = useMemo(() => calculateDailyTotals(entries), [entries]);
+
+  useEffect(() => {
+    fetchEntries(selectedDate);
+  }, [fetchEntries, selectedDate]);
 
   return (
     <>
