@@ -45,7 +45,9 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
     const reader = new BrowserMultiFormatReader();
 
     const stopScanner = () => {
-      reader.reset();
+      if (typeof (reader as unknown as { reset?: () => void }).reset === 'function') {
+        (reader as unknown as { reset?: () => void }).reset?.();
+      }
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
