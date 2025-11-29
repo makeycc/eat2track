@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { BrowserMultiFormatReader } from '@zxing/browser';
+import { useEffect, useRef, useState } from 'react';
 import { DiaryEntry, Product } from '../types';
 
 const emptyProduct: Product = {
@@ -20,6 +21,9 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
   const [product, setProduct] = useState<Product>(emptyProduct);
   const [weight, setWeight] = useState('100');
   const [query, setQuery] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const handleSubmit = () => {
     if (!product.name.trim()) return;
@@ -32,6 +36,73 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
     setProduct(emptyProduct);
     setWeight('100');
   };
+
+  useEffect(() => {
+    if (!isScanning || !videoRef.current) return undefined;
+
+    let cancelled = false;
+    let stream: MediaStream | null = null;
+    const reader = new BrowserMultiFormatReader();
+
+    const stopScanner = () => {
+      if (typeof (reader as unknown as { reset?: () => void }).reset === 'function') {
+        (reader as unknown as { reset?: () => void }).reset?.();
+      }
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    };
+
+    const startScanner = async () => {
+      try {
+        setScanError(null);
+        if (!navigator.mediaDevices?.getUserMedia) {
+          setScanError('Сканер недоступен в этом браузере.');
+          setIsScanning(false);
+          return;
+        }
+
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' },
+        });
+
+        if (!videoRef.current || cancelled) return;
+
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+
+        const result = await reader.decodeOnceFromVideoDevice(undefined, videoRef.current);
+
+        if (!cancelled && result) {
+          const barcode = result.getText();
+          setQuery(barcode);
+          onSearch(barcode);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        if (error instanceof DOMException && error.name === 'NotAllowedError') {
+          setScanError('Доступ к камере отклонен. Разрешите доступ и попробуйте снова.');
+        } else {
+          setScanError('Не удалось открыть камеру. Проверьте разрешения и попробуйте снова.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsScanning(false);
+        }
+        stopScanner();
+      }
+    };
+
+    startScanner();
+
+    return () => {
+      cancelled = true;
+      stopScanner();
+    };
+  }, [isScanning, onSearch]);
 
   return (
     <div className="add-product">
@@ -52,7 +123,26 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
         >
           Искать
         </button>
+        <button
+          type="button"
+          className="ghost"
+          onClick={() => {
+            setScanError(null);
+            setIsScanning((prev) => !prev);
+          }}
+        >
+          {isScanning ? 'Остановить сканер' : 'Сканировать штрих-код'}
+        </button>
       </div>
+
+      {isScanning && (
+        <div className="scanner">
+          <video ref={videoRef} className="scanner-video" muted playsInline />
+          <div className="scanner-hint">Наведите камеру на штрих-код</div>
+        </div>
+      )}
+
+      {scanError && <div className="scanner-error">{scanError}</div>}
 
       {!!history.length && (
         <div className="history">
