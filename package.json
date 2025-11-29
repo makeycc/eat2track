@@ -9,10 +9,6 @@
     "preview": "vite preview",
     "lint": "echo 'Add a linter such as eslint when dependencies are available.'"
   },
-  "engines": {
-    "node": "20.x",
-    "npm": ">=10.8.0"
-  },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.2",
     "@twa-dev/sdk": "^1.8.0",
