@@ -1,13 +1,9 @@
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { DiaryEntry, Product } from '../types';
+import { supabase } from '../lib/supabase';
+import { NewDiaryEntry, Product } from '../types';
 
-const catalogSeed: Product[] = [
-  { id: 'p1', name: 'Куриная грудка', calories: 165, protein: 31, fat: 3.6, carbs: 0, barcode: '200000000001' },
-  { id: 'p2', name: 'Рис отварной', calories: 130, protein: 2.7, fat: 0.3, carbs: 28, barcode: '200000000002' },
-  { id: 'p3', name: 'Авокадо', calories: 160, protein: 2, fat: 15, carbs: 9, barcode: '200000000003' },
-  { id: 'p4', name: 'Яблоко', calories: 52, protein: 0.3, fat: 0.2, carbs: 14 },
-];
+const PRODUCT_CACHE_KEY = 'eat2track-products-cache';
 
 const emptyProduct = (name = '', barcode = ''): Product => ({
   id: '',
@@ -19,8 +15,29 @@ const emptyProduct = (name = '', barcode = ''): Product => ({
   barcode,
 });
 
+function loadCachedProducts(): Product[] {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(PRODUCT_CACHE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as Product[];
+  } catch (error) {
+    console.warn('Failed to parse product cache', error);
+    return [];
+  }
+}
+
+function persistProducts(products: Product[]) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(PRODUCT_CACHE_KEY, JSON.stringify(products));
+  } catch (error) {
+    console.warn('Failed to persist product cache', error);
+  }
+}
+
 type AddProductFormProps = {
-  onSubmit: (entry: DiaryEntry) => void;
+  onSubmit: (entry: NewDiaryEntry) => Promise<void>;
   onSearch: (query: string) => void;
   history: string[];
 };
@@ -28,7 +45,7 @@ type AddProductFormProps = {
 type FormMode = 'idle' | 'weight' | 'manual';
 
 export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormProps) {
-  const [catalog, setCatalog] = useState<Product[]>(catalogSeed);
+  const [catalog, setCatalog] = useState<Product[]>(() => loadCachedProducts());
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [manualProduct, setManualProduct] = useState<Product>(emptyProduct());
@@ -37,6 +54,8 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
   const [mode, setMode] = useState<FormMode>('idle');
   const [isScanning, setIsScanning] = useState(true);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const macrosSummary = useMemo(() => {
@@ -71,23 +90,51 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
     setWeight('100');
   };
 
-  const performSearch = (value: string) => {
+  const performSearch = async (value: string) => {
     const term = value.trim();
     if (!term) return;
     onSearch(term);
     setQuery(term);
 
-    const lower = term.toLowerCase();
-    const results = catalog.filter(
-      (item) => item.name.toLowerCase().includes(lower) || (item.barcode && item.barcode.includes(term)),
-    );
+    setIsSearching(true);
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, calories, protein, fat, carbs, barcode, notes')
+        .or(`name.ilike.%${term}%,barcode.eq.${term}`)
+        .limit(10);
 
-    setSearchResults(results);
+      if (error) throw error;
 
-    if (results.length > 0) {
-      startWeightOnly(results[0]);
-    } else {
-      startManual(term, /\d+/.test(term) ? term : '');
+      const results = (data ?? []) as Product[];
+      setSearchResults(results);
+      if (results.length) {
+        setCatalog((prev) => {
+          const merged = [...prev];
+          results.forEach((item) => {
+            if (!merged.find((p) => p.id === item.id)) merged.push(item);
+          });
+          persistProducts(merged);
+          return merged;
+        });
+        startWeightOnly(results[0]);
+      } else {
+        startManual(term, /\d+/.test(term) ? term : '');
+      }
+    } catch (error) {
+      console.warn('Search failed, using cached products', error);
+      const lower = term.toLowerCase();
+      const fallback = catalog.filter(
+        (item) => item.name.toLowerCase().includes(lower) || (item.barcode && item.barcode.includes(term)),
+      );
+      setSearchResults(fallback);
+      if (fallback.length) {
+        startWeightOnly(fallback[0]);
+      } else {
+        startManual(term, /\d+/.test(term) ? term : '');
+      }
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -96,27 +143,59 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
     performSearch(barcode);
   };
 
-  const handleSaveSelected = () => {
+  const handleSaveSelected = async () => {
     if (!selectedProduct) return;
     const grams = Math.max(1, Math.round(Number(weight) || 0));
-    onSubmit({
-      id: crypto.randomUUID(),
+    setIsSaving(true);
+    await onSubmit({
       product: selectedProduct,
       weight: grams,
     });
+    setIsSaving(false);
     resetState();
   };
 
-  const handleSaveManual = () => {
+  const handleSaveManual = async () => {
     if (!manualProduct.name.trim()) return;
     const grams = Math.max(1, Math.round(Number(weight) || 0));
-    const newProduct: Product = { ...manualProduct, id: crypto.randomUUID(), barcode: manualProduct.barcode || undefined };
-    setCatalog((prev) => [...prev, newProduct]);
-    onSubmit({
-      id: crypto.randomUUID(),
-      product: newProduct,
+    const newProduct: Product = {
+      ...manualProduct,
+      id: manualProduct.id || crypto.randomUUID(),
+      barcode: manualProduct.barcode || undefined,
+    };
+
+    setIsSaving(true);
+    const { data, error } = await supabase
+      .from('products')
+      .upsert({
+        id: newProduct.id,
+        name: newProduct.name,
+        calories: newProduct.calories,
+        protein: newProduct.protein,
+        fat: newProduct.fat,
+        carbs: newProduct.carbs,
+        barcode: newProduct.barcode ?? null,
+        notes: newProduct.notes ?? null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.warn('Failed to save product online, keeping local copy', error);
+    }
+
+    const savedProduct = (data as Product | null) ?? newProduct;
+    setCatalog((prev) => {
+      const merged = [...prev.filter((item) => item.id !== savedProduct.id), savedProduct];
+      persistProducts(merged);
+      return merged;
+    });
+
+    await onSubmit({
+      product: savedProduct,
       weight: grams,
     });
+    setIsSaving(false);
     resetState();
   };
 
@@ -228,8 +307,8 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
               if (e.key === 'Enter') performSearch(query);
             }}
           />
-          <button type="button" onClick={() => performSearch(query)}>
-            Искать
+          <button type="button" onClick={() => performSearch(query)} disabled={isSearching}>
+            {isSearching ? 'Ищем…' : 'Искать'}
           </button>
           <button type="button" className="ghost" onClick={() => startManual(query)}>
             Ручной ввод
@@ -306,8 +385,8 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
             <button type="button" className="ghost" onClick={resetState}>
               Отмена
             </button>
-            <button type="button" onClick={handleSaveSelected}>
-              Сохранить вес
+            <button type="button" onClick={handleSaveSelected} disabled={isSaving}>
+              {isSaving ? 'Сохраняем…' : 'Сохранить вес'}
             </button>
           </div>
         </div>
@@ -391,8 +470,8 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
             <button type="button" className="ghost" onClick={resetState}>
               Отмена
             </button>
-            <button type="button" onClick={handleSaveManual}>
-              Сохранить продукт
+            <button type="button" onClick={handleSaveManual} disabled={isSaving}>
+              {isSaving ? 'Сохраняем…' : 'Сохранить продукт'}
             </button>
           </div>
         </div>

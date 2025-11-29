@@ -27,6 +27,37 @@
 - `VITE_SUPABASE_URL` — URL проекта Supabase.
 - `VITE_SUPABASE_ANON_KEY` — публичный anon-key.
 
+### Структура таблиц в Supabase
+Создайте две таблицы (SQL можно выполнить в SQL Editor Supabase):
+
+```sql
+create table products (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  barcode text unique,
+  calories numeric not null,
+  protein numeric not null,
+  fat numeric not null,
+  carbs numeric not null,
+  notes text,
+  inserted_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+create table diary_entries (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  date date not null,
+  product_id uuid references products(id) on delete cascade,
+  weight integer not null,
+  override_macros jsonb,
+  created_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+create index diary_entries_user_date_idx on diary_entries(user_id, date);
+```
+
+Приложение читает `products` по имени или `barcode` и пишет в `diary_entries` через upsert, поэтому схемы выше достаточно для работы CRUD и последующей синхронизации офлайн-кэша.
+
 ### Деплой на Vercel
 - Vercel автоматически определит Vite и соберёт приложение командой `npm run build`. Фронтенд лежит в `dist`.
 - Чтобы избежать ошибки `@npmcli/ci-detect` из-за несовместимой версии Node, задайте в проекте переменную окружения `NODE_VERSION=20` (или поставьте значение в настройках Build & Development Settings). Также можно подключить `.nvmrc` — он фиксирует локальную версию 20.
