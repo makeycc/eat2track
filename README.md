@@ -38,3 +38,41 @@
 ## Стек
 - React + TypeScript + Vite
 - Zustand для стейта (готов к использованию, подключение supabase-js для последующей синхронизации).
+
+## Подключение Telegram-бота к мини-приложению
+1. Создайте бота через @BotFather (`/newbot`). Сохраните токен `BOT_TOKEN`.
+2. Задайте домен Web App в @BotFather: `/setdomain` → ваш прод-домен (например, `https://eat2track.vercel.app`). Домен должен быть https и совпадать с URL, который вы передаете кнопке.
+3. Включите кнопку открытия Web App в чате командой `/setmenubutton` → Web App → тот же URL.
+4. Запустите простого бота, который шлет кнопку с Web App. Ниже — минимальный пример на Node 20 + `telegraf`:
+   ```ts
+   // bot.ts
+   import { Telegraf, Markup } from 'telegraf'
+
+   const BOT_TOKEN = process.env.BOT_TOKEN!
+   const WEBAPP_URL = process.env.WEBAPP_URL || 'https://eat2track.vercel.app'
+
+   const bot = new Telegraf(BOT_TOKEN)
+
+   bot.start((ctx) => {
+     ctx.reply(
+       'Открыть дневник питания',
+       Markup.inlineKeyboard([
+         Markup.button.webApp('Открыть мини‑апп', WEBAPP_URL),
+       ])
+     )
+   })
+
+   bot.launch()
+   ```
+   Запуск:
+   ```bash
+   npm install telegraf
+   BOT_TOKEN=123:abc WEBAPP_URL=https://eat2track.vercel.app node bot.ts
+   ```
+5. Проверьте, что ссылка открывает приложение внутри Telegram. Если видите «Классическое представление», значит домен не совпадает с доменом из `/setdomain`.
+6. Для локальной проверки используйте туннель (ngrok, Cloudflare Tunnel) и временно задайте его https-домен в `/setdomain`.
+
+### Советы по дебагу
+- Если Web App не открывается внутри Telegram, убедитесь, что сертификат валидный и домен совпадает с тем, что вы передали @BotFather.
+- Добавьте логирование `console.log(ctx.from)` в хендлере `start`, чтобы видеть `user.id`, который приходит в WebApp через `window.Telegram.WebApp.initDataUnsafe`.
+- В проде храните `BOT_TOKEN` и `WEBAPP_URL` как секреты на хостинге, не коммитьте их в репозиторий.
