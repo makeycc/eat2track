@@ -36,6 +36,39 @@ header {
   gap: 12px;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.nav-button {
+  text-decoration: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: #0f172a;
+  background: #fff;
+  transition: 0.15s ease;
+}
+
+.nav-button:hover {
+  filter: brightness(0.97);
+}
+
+.nav-button.active {
+  background: #0ea5e9;
+  color: #fff;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+}
+
 h1 {
   margin: 0;
   font-size: 28px;
@@ -329,6 +362,22 @@ textarea {
   header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .header-right {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .nav-buttons {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .nav-button {
+    flex: 1 1 140px;
+    text-align: center;
   }
 
   .food-header {
