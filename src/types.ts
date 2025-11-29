@@ -8,6 +8,7 @@ export type Macros = {
 export type Product = Macros & {
   id: string;
   name: string;
+  barcode?: string;
   notes?: string;
 };
 
