@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DaySlider } from '../components/DaySlider';
 import { MacroSummary } from '../components/MacroSummary';
 import { FoodList } from '../components/FoodList';
@@ -21,6 +22,7 @@ function calculateDailyTotals(entries: DiaryEntry[]): Macros {
 }
 
 export function HomePage() {
+  const navigate = useNavigate();
   const selectedDate = useDiaryStore((state) => state.selectedDate);
   const setSelectedDate = useDiaryStore((state) => state.setSelectedDate);
   const entries = useDiaryStore((state) => state.entries[state.selectedDate] ?? []);
@@ -45,6 +47,10 @@ export function HomePage() {
         </div>
         <FoodList entries={entries} onUpdate={updateEntry} onDelete={deleteEntry} />
       </section>
+
+      <button type="button" className="floating-add-button" onClick={() => navigate('/add')}>
+        Добавить продукт
+      </button>
     </>
   );
 }

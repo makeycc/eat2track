@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { AddProductForm } from '../components/AddProductForm';
 import { DaySlider } from '../components/DaySlider';
 import { useDiaryStore } from '../store/useDiaryStore';
@@ -15,8 +16,11 @@ export function AddProductPage() {
 
       <section>
         <div className="section-header">
-          <h2>Добавить продукт</h2>
-          <span className="hint">дата: {selectedDate}</span>
+          <div>
+            <h2>Добавить продукт</h2>
+            <span className="hint">дата: {selectedDate}</span>
+          </div>
+          <Link to="/" className="nav-button ghost">Назад</Link>
         </div>
         <AddProductForm onSubmit={addEntry} onSearch={recordSearch} history={searchHistory} />
       </section>
