@@ -20,7 +20,10 @@ body {
 #root {
   max-width: 960px;
   margin: 0 auto;
-  padding: 24px 16px 48px;
+  padding: calc(24px + env(safe-area-inset-top))
+    calc(16px + env(safe-area-inset-right))
+    calc(48px + env(safe-area-inset-bottom))
+    calc(16px + env(safe-area-inset-left));
 }
 
 .app-shell {
@@ -360,7 +363,7 @@ button.primary {
 
 .floating-add-button {
   position: fixed;
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   z-index: 10;
