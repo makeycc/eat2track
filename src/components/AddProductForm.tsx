@@ -56,6 +56,9 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
   const [scanError, setScanError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [cameraStatus, setCameraStatus] = useState<'idle' | 'requesting' | 'ready' | 'error'>('idle');
+  const [decoderStatus, setDecoderStatus] = useState<'idle' | 'ready' | 'decoded' | 'error'>('idle');
+  const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const macrosSummary = useMemo(() => {
@@ -75,6 +78,8 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
     setManualProduct(emptyProduct());
     setWeight('100');
     setMode('idle');
+    setDecoderStatus('idle');
+    setLastScannedCode(null);
   };
 
   const startManual = (name = '', barcode = '') => {
@@ -140,6 +145,8 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
 
   const handleScannerDecode = (barcode: string) => {
     setScanError(null);
+    setLastScannedCode(barcode);
+    setDecoderStatus('decoded');
     performSearch(barcode);
   };
 
@@ -190,6 +197,10 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
       persistProducts(merged);
       return merged;
     });
+    setSearchResults((prev) => {
+      const filtered = prev.filter((item) => item.id !== savedProduct.id);
+      return [savedProduct, ...filtered];
+    });
 
     await onSubmit({
       product: savedProduct,
@@ -221,9 +232,13 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
     const startScanner = async () => {
       try {
         setScanError(null);
+        setCameraStatus('requesting');
+        setDecoderStatus('idle');
+        setLastScannedCode(null);
         if (!navigator.mediaDevices?.getUserMedia) {
           setScanError('Сканер недоступен в этом браузере.');
           setIsScanning(false);
+          setCameraStatus('error');
           return;
         }
 
@@ -235,6 +250,8 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
 
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
+        setCameraStatus('ready');
+        setDecoderStatus('ready');
 
         const result = await reader.decodeOnceFromVideoDevice(undefined, videoRef.current);
 
@@ -249,6 +266,8 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
         } else {
           setScanError('Не удалось открыть камеру. Проверьте разрешения и попробуйте снова.');
         }
+        setCameraStatus('error');
+        setDecoderStatus('error');
       } finally {
         if (!cancelled) {
           setIsScanning(false);
@@ -280,10 +299,27 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
               onClick={() => {
                 setScanError(null);
                 setIsScanning(true);
+                setCameraStatus('idle');
+                setDecoderStatus('idle');
+                setLastScannedCode(null);
               }}
             >
               Перезапустить
             </button>
+            <button type="button" className="ghost" onClick={() => startManual(query || lastScannedCode || '')}>
+              Ручной ввод
+            </button>
+          </div>
+        </div>
+        <div className="scanner-status-grid">
+          <div className={`status-chip ${cameraStatus === 'ready' ? 'success' : cameraStatus === 'error' ? 'error' : 'pending'}`}>
+            Камера: {cameraStatus === 'ready' ? 'готова' : cameraStatus === 'error' ? 'ошибка' : 'запрашиваем доступ'}
+          </div>
+          <div className={`status-chip ${decoderStatus === 'decoded' ? 'success' : decoderStatus === 'error' ? 'error' : 'pending'}`}>
+            Декодер: {decoderStatus === 'decoded' ? 'штрих-код считан' : decoderStatus === 'error' ? 'ошибка' : 'ожидание'}
+          </div>
+          <div className="status-chip neutral">
+            {lastScannedCode ? `Последний код: ${lastScannedCode}` : 'Код пока не считан'}
           </div>
         </div>
         <div className="scanner-shell">
@@ -386,7 +422,7 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
               Отмена
             </button>
             <button type="button" onClick={handleSaveSelected} disabled={isSaving}>
-              {isSaving ? 'Сохраняем…' : 'Сохранить вес'}
+              {isSaving ? 'Сохраняем…' : 'Сохранить'}
             </button>
           </div>
         </div>
@@ -471,7 +507,7 @@ export function AddProductForm({ onSubmit, onSearch, history }: AddProductFormPr
               Отмена
             </button>
             <button type="button" onClick={handleSaveManual} disabled={isSaving}>
-              {isSaving ? 'Сохраняем…' : 'Сохранить продукт'}
+              {isSaving ? 'Сохраняем…' : 'Сохранить'}
             </button>
           </div>
         </div>
