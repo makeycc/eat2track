@@ -1,6 +1,7 @@
 import { NavLink, BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AddProductPage } from './pages/AddProductPage';
 import { HomePage } from './pages/HomePage';
+import { ProductPage } from './pages/ProductPage';
 import { useDiaryStore } from './store/useDiaryStore';
 
 export default function App() {
@@ -23,6 +24,9 @@ export default function App() {
               <NavLink to="/add" className={({ isActive }) => `nav-button ${isActive ? 'active' : ''}`}>
                 Добавить
               </NavLink>
+              <NavLink to="/product" className={({ isActive }) => `nav-button ${isActive ? 'active' : ''}`}>
+                Продукт
+              </NavLink>
             </nav>
           </div>
         </header>
@@ -30,6 +34,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/add" element={<AddProductPage />} />
+          <Route path="/product" element={<ProductPage />} />
         </Routes>
       </div>
     </BrowserRouter>

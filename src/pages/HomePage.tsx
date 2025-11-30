@@ -27,7 +27,6 @@ export function HomePage() {
   const setSelectedDate = useDiaryStore((state) => state.setSelectedDate);
   const entries = useDiaryStore((state) => state.entries[state.selectedDate] ?? []);
   const fetchEntries = useDiaryStore((state) => state.fetchEntries);
-  const updateEntry = useDiaryStore((state) => state.updateEntry);
   const deleteEntry = useDiaryStore((state) => state.deleteEntry);
 
   const totals = useMemo(() => calculateDailyTotals(entries), [entries]);
@@ -50,7 +49,7 @@ export function HomePage() {
           <h2>Продукты</h2>
           <span className="hint">редактируйте вес и КБЖУ без лишних шагов</span>
         </div>
-        <FoodList entries={entries} onUpdate={updateEntry} onDelete={deleteEntry} />
+        <FoodList entries={entries} onDelete={deleteEntry} />
       </section>
 
       <button type="button" className="floating-add-button" onClick={() => navigate('/add')}>
